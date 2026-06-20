@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Машина времени — was / were</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  :root{
+    --bgTop:#1a1c2e; --bgBot:#232645;
+    --ink:#f4ecd8; --inkDim:#b9b2c9;
+    --brass:#e8a13a; --teal:#3ea8a0; --good:#43c66b; --bad:#e2603f;
+    --card:#2b2e49; --cardLine:#3c4068; --cardHi:#343860;
+  }
+  html,body{height:100%}
+  body{
+    font-family:'Nunito',sans-serif;
+    color:var(--ink);
+    background:linear-gradient(160deg,var(--bgTop),var(--bgBot));
+    transition:background .8s ease;
+    min-height:100vh;
+    display:flex;flex-direction:column;align-items:center;
+    padding:10px;
+    overflow-x:hidden;
+  }
+  .wrap{width:100%;max-width:540px;display:flex;flex-direction:column;gap:10px}
+
+  /* ---------- HUD ---------- */
+  .hud{
+    display:flex;align-items:center;gap:10px;
+    background:rgba(0,0,0,.22);border:1px solid var(--cardLine);
+    border-radius:16px;padding:8px 12px;backdrop-filter:blur(4px);
+  }
+  .portal{width:34px;height:34px;flex:none}
+  .portal .ring{transform-origin:50% 50%;animation:spin 6s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .score{font-family:'Russo One';font-size:18px;color:var(--brass);white-space:nowrap}
+  .score .pts{display:inline-block;transition:transform .2s}
+  .score.bump .pts{transform:scale(1.4)}
+  .year{
+    margin-left:auto;font-family:'Russo One';font-size:15px;color:var(--ink);
+    background:rgba(232,161,58,.16);border:1px solid var(--brass);
+    border-radius:10px;padding:4px 9px;white-space:nowrap;
+  }
+  .energyWrap{width:100%;display:flex;flex-direction:column;gap:3px}
+  .energyLbl{font-size:11px;color:var(--inkDim);letter-spacing:.3px}
+  .energyBar{height:9px;border-radius:6px;background:rgba(0,0,0,.3);overflow:hidden;border:1px solid var(--cardLine)}
+  .energyFill{height:100%;width:0;border-radius:6px;
+    background:linear-gradient(90deg,var(--teal),var(--brass));transition:width .5s ease}
+
+  /* ---------- Stage ---------- */
+  .stage{
+    background:var(--card);border:1px solid var(--cardLine);
+    border-radius:20px;padding:18px 16px 20px;min-height:360px;
+    display:flex;flex-direction:column;gap:14px;
+    box-shadow:0 10px 28px rgba(0,0,0,.28);
+  }
+  .lvlTag{font-size:12px;font-weight:800;letter-spacing:1px;color:var(--brass);text-transform:uppercase}
+  .qcount{font-size:12px;color:var(--inkDim);margin-left:auto}
+  .row{display:flex;align-items:center;gap:8px}
+  .prompt{font-size:21px;font-weight:800;line-height:1.4}
+  .prompt .gap{color:var(--brass)}
+  .hint{font-size:14px;color:var(--inkDim);font-style:italic}
+
+  .btn{
+    font-family:'Nunito';font-weight:800;font-size:17px;color:var(--ink);
+    background:var(--cardHi);border:2px solid var(--cardLine);
+    border-radius:14px;padding:13px 14px;cursor:pointer;
+    transition:transform .08s, border-color .15s, background .15s;
+    text-align:center;
+  }
+  .btn:hover{border-color:var(--brass)}
+  .btn:active{transform:scale(.97)}
+  .btn.lock{pointer-events:none;opacity:.85}
+  .btn.right{background:rgba(67,198,107,.18);border-color:var(--good);color:#d8ffe4}
+  .btn.wrong{background:rgba(226,96,63,.16);border-color:var(--bad);color:#ffd9cd}
+
+  .opts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .opts.col1{grid-template-columns:1fr}
+  .tf{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .tf .btn{font-size:18px;padding:16px}
+
+  .inputRow{display:flex;gap:8px}
+  .field{
+    flex:1;font-family:'Nunito';font-size:19px;font-weight:700;color:var(--ink);
+    background:#20223a;border:2px solid var(--cardLine);border-radius:14px;
+    padding:13px 14px;outline:none;
+  }
+  .field:focus{border-color:var(--brass)}
+  .field.right{border-color:var(--good)}
+  .field.wrong{border-color:var(--bad)}
+  .check{flex:none;background:var(--brass);color:#231a08;border:none;
+    font-weight:800;font-size:16px;border-radius:14px;padding:0 18px;cursor:pointer}
+  .check:active{transform:scale(.96)}
+
+  /* sentence builder */
+  .answerLine{min-height:54px;border:2px dashed var(--cardLine);border-radius:14px;
+    padding:8px;display:flex;flex-wrap:wrap;gap:7px;align-content:flex-start;background:#20223a}
+  .answerLine.right{border-color:var(--good);border-style:solid;background:rgba(67,198,107,.1)}
+  .answerLine.wrong{border-color:var(--bad);border-style:solid}
+  .bank{display:flex;flex-wrap:wrap;gap:8px}
+  .tile{font-weight:800;font-size:16px;background:var(--cardHi);border:2px solid var(--cardLine);
+    border-radius:11px;padding:9px 13px;cursor:pointer;transition:transform .08s,opacity .15s}
+  .tile:active{transform:scale(.95)}
+  .tile.used{opacity:.25;pointer-events:none}
+  .tile.inanswer{background:rgba(232,161,58,.18);border-color:var(--brass)}
+  .ctrlRow{display:flex;gap:8px;margin-top:2px}
+  .ghost{background:transparent;border:2px solid var(--cardLine);color:var(--inkDim);
+    border-radius:12px;padding:10px 14px;font-weight:700;font-size:14px;cursor:pointer;flex:1}
+
+  /* memory */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .mcard{height:74px;border-radius:13px;border:2px solid var(--cardLine);background:var(--cardHi);
+    display:flex;align-items:center;justify-content:center;text-align:center;
+    font-weight:700;font-size:14px;line-height:1.25;padding:6px;cursor:pointer;
+    transition:transform .1s,background .2s,border-color .2s}
+  .mcard .face{display:none}
+  .mcard.open{background:#20223a;border-color:var(--brass)}
+  .mcard.open .face{display:block}
+  .mcard.open .back{display:none}
+  .mcard .back{font-size:24px;color:var(--brass)}
+  .mcard.matched{background:rgba(67,198,107,.16);border-color:var(--good);color:#d8ffe4;cursor:default}
+  .mcard.matched .face{display:block}.mcard.matched .back{display:none}
+
+  /* boss */
+  .boss{display:flex;flex-direction:column;align-items:center;gap:6px}
+  .bossSvg{width:120px;height:120px}
+  .bossSvg .arm{transform-origin:center;animation:wob 2.2s ease-in-out infinite}
+  @keyframes wob{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
+  .hpWrap{width:100%;display:flex;align-items:center;gap:8px}
+  .hpBar{flex:1;height:14px;background:rgba(0,0,0,.35);border-radius:8px;overflow:hidden;border:1px solid var(--cardLine)}
+  .hpFill{height:100%;width:100%;background:linear-gradient(90deg,#e2603f,#e8a13a);transition:width .4s}
+  .hpTxt{font-family:'Russo One';font-size:13px;color:var(--bad)}
+  .hit{animation:hit .35s}
+  @keyframes hit{0%{transform:translateX(0)}25%{transform:translateX(-7px)}50%{transform:translateX(7px)}75%{transform:translateX(-4px)}100%{transform:translateX(0)}}
+
+  /* feedback overlay */
+  .fb{position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+    background:rgba(10,8,20,.55);z-index:30;padding:18px}
+  .fb.show{display:flex}
+  .fbCard{background:var(--card);border:2px solid var(--bad);border-radius:18px;
+    padding:22px 20px;max-width:340px;width:100%;text-align:center;position:relative}
+  .fbCard.ok{border-color:var(--good)}
+  .fbX{position:absolute;top:8px;right:12px;font-size:22px;color:var(--inkDim);
+    cursor:pointer;background:none;border:none;line-height:1}
+  .fbTitle{font-family:'Russo One';font-size:22px;margin-bottom:8px}
+  .fbCard.ok .fbTitle{color:var(--good)}
+  .fbCard:not(.ok) .fbTitle{color:var(--bad)}
+  .fbAns{font-size:18px;font-weight:800;margin:6px 0 14px;color:var(--ink)}
+  .fbAns b{color:var(--brass)}
+  .fbNext{background:var(--brass);color:#231a08;border:none;font-weight:800;
+    font-size:16px;border-radius:12px;padding:11px 22px;cursor:pointer}
+  .toast{position:fixed;top:14px;left:50%;transform:translateX(-50%) translateY(-80px);
+    background:var(--good);color:#08210f;font-family:'Russo One';font-size:17px;
+    padding:10px 20px;border-radius:30px;z-index:40;opacity:0;transition:transform .3s,opacity .3s;box-shadow:0 6px 18px rgba(0,0,0,.3)}
+  .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+
+  /* intro / start / win screens */
+  .center{display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;justify-content:center;flex:1}
+  .bigTitle{font-family:'Russo One';font-size:27px;line-height:1.2}
+  .bigTitle .acc{color:var(--brass)}
+  .sub{color:var(--inkDim);font-size:15px;max-width:380px;line-height:1.5}
+  .startBtn{font-family:'Russo One';font-size:19px;color:#231a08;background:var(--brass);
+    border:none;border-radius:16px;padding:15px 34px;cursor:pointer;box-shadow:0 6px 0 #a9701f}
+  .startBtn:active{transform:translateY(3px);box-shadow:0 3px 0 #a9701f}
+  .portalBig{width:120px;height:120px}
+  .rulesBtn{background:transparent;border:1px solid var(--cardLine);color:var(--inkDim);
+    border-radius:20px;padding:8px 16px;font-weight:700;font-size:13px;cursor:pointer}
+  .rules{display:none;background:#20223a;border:1px solid var(--cardLine);border-radius:14px;
+    padding:14px;text-align:left;font-size:14px;line-height:1.6;max-width:420px}
+  .rules.show{display:block}
+  .rules h4{font-family:'Russo One';font-size:13px;color:var(--brass);margin:10px 0 3px}
+  .rules h4:first-child{margin-top:0}
+  .rules code{color:var(--teal);font-weight:800}
+  .stars{font-size:40px;letter-spacing:6px}
+  .againBtn{font-family:'Russo One';font-size:16px;color:var(--ink);background:var(--cardHi);
+    border:2px solid var(--cardLine);border-radius:14px;padding:12px 26px;cursor:pointer}
+  @media(max-width:380px){
+    .prompt{font-size:19px}.opts{gap:8px}.btn{font-size:15px;padding:11px}
+    .mcard{height:68px;font-size:13px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hud">
+    <svg class="portal" viewBox="0 0 40 40">
+      <circle cx="20" cy="20" r="18" fill="none" stroke="#3c4068" stroke-width="3"/>
+      <g class="ring">
+        <circle cx="20" cy="20" r="13" fill="none" stroke="#3ea8a0" stroke-width="3" stroke-dasharray="6 9"/>
+        <circle cx="20" cy="20" r="8" fill="none" stroke="#e8a13a" stroke-width="3" stroke-dasharray="4 6"/>
+      </g>
+      <circle cx="20" cy="20" r="3" fill="#e8a13a"/>
+    </svg>
+    <div class="score">⭐ <span class="pts" id="pts">0</span></div>
+    <div class="year" id="year">📅 2026</div>
+  </div>
+  <div class="energyWrap">
+    <div class="energyLbl">⚡ Машина времени · путь в прошлое</div>
+    <div class="energyBar"><div class="energyFill" id="energy"></div></div>
+  </div>
+
+  <div class="stage" id="stage"></div>
+</div>
+
+<div class="toast" id="toast">ВЕРНО! +10 ⭐</div>
+
+<div class="fb" id="fb">
+  <div class="fbCard" id="fbCard">
+    <button class="fbX" id="fbX">✕</button>
+    <div class="fbTitle" id="fbTitle"></div>
+    <div class="fbAns" id="fbAns"></div>
+    <button class="fbNext" id="fbNext">Дальше →</button>
+  </div>
+</div>
+
+<script>
+/* =================== STATE =================== */
+const TOTAL_TASKS = 41;          // 5 + 8 + 6 + 8 + 6 + 8
+const START_YEAR = 2026, END_YEAR = 1928;
+let score = 0, correctCount = 0;
+let stage = document.getElementById('stage');
+
+/* =================== HELPERS =================== */
+function norm(s){
+  return (s||'').toLowerCase()
+    .replace(/[’‘`´]/g,"'")
+    .replace(/[.!?,;:]/g,'')
+    .replace(/\s+/g,' ').trim();
+}
+function lerp(a,b,t){return Math.round(a+(b-a)*t)}
+function mix(c1,c2,t){return `rgb(${lerp(c1[0],c2[0],t)},${lerp(c1[1],c2[1],t)},${lerp(c1[2],c2[2],t)})`}
+
+function award(){
+  score += 10; correctCount++;
+  const p = document.getElementById('pts'); p.textContent = score;
+  const sc = document.querySelector('.score'); sc.classList.add('bump');
+  setTimeout(()=>sc.classList.remove('bump'),200);
+  updateProgress();
+}
+function updateProgress(){
+  const t = correctCount / TOTAL_TASKS;
+  document.getElementById('energy').style.width = (t*100)+'%';
+  const yr = Math.round(START_YEAR - t*(START_YEAR-END_YEAR));
+  document.getElementById('year').textContent = '📅 '+yr;
+  // background: cool present -> warm sepia past
+  const top1=[26,28,46], top2=[42,29,18], bot1=[35,38,69], bot2=[58,36,21];
+  document.body.style.background =
+    `linear-gradient(160deg,${mix(top1,top2,t)},${mix(bot1,bot2,t)})`;
+}
+
+function toast(){
+  const el=document.getElementById('toast');
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),1100);
+}
+/* correct: green toast + auto-advance ~1.3s */
+function good(after){ toast(); setTimeout(after,1300); }
+/* wrong: stays until student closes (study the mistake) */
+function bad(correctText, after){
+  const fb=document.getElementById('fb'), card=document.getElementById('fbCard');
+  card.classList.remove('ok');
+  document.getElementById('fbTitle').textContent='Неверно';
+  document.getElementById('fbAns').innerHTML = correctText? ('Правильно: <b>'+correctText+'</b>') : '';
+  fb.classList.add('show');
+  const close=()=>{ fb.classList.remove('show');
+    document.getElementById('fbX').onclick=null;
+    document.getElementById('fbNext').onclick=null; after(); };
+  document.getElementById('fbX').onclick=close;
+  document.getElementById('fbNext').onclick=close;
+}
+
+/* =================== CONTENT =================== */
+/* Level 1 — memory (EN sentence <-> RU) */
+const MEM = [
+  ["He was an artist.","Он был художником."],
+  ["Were they famous?","Они были известными?"],
+  ["I wasn't at home.","Меня не было дома."],
+  ["She was born in 1928.","Она родилась в 1928."],
+  ["We weren't tired.","Мы не устали."]
+];
+
+/* Level 2 — multiple choice */
+const MC = [
+  {q:"Andy Warhol ___ an artist.", o:["was","were","wasn't"], a:0},
+  {q:"___ his parents American?",  o:["Was","Were","Wasn't"], a:1},
+  {q:"The Beatles ___ famous.",    o:["was","were","wasn't"], a:1},
+  {q:"She ___ at work this morning. (её не было)", o:["wasn't","weren't","was"], a:0},
+  {q:"___ you tired yesterday?",   o:["Was","Were","Wasn't"], a:1},
+  {q:"Van Gogh ___ Dutch.",        o:["was","were","weren't"], a:0},
+  {q:"They ___ at the party. (их не было)", o:["wasn't","weren't","was"], a:1},
+  {q:"___ it cold last night?",    o:["Was","Were","Weren't"], a:0}
+];
+
+/* Level 3 — true / false */
+const TF = [
+  {q:"Andy Warhol was American.", a:true},
+  {q:"Van Gogh was English.",     a:false},
+  {q:"The Beatles were famous in the 1960s.", a:true},
+  {q:"We use «were» with «they».", a:true},
+  {q:"We use «was» with «you».",  a:false},
+  {q:"Vigée Le Brun was a painter.", a:true}
+];
+
+/* Level 4 — fill the gap (typed) */
+const FILL = [
+  {q:"He ___ born in 1928.",            ok:["was"]},
+  {q:"___ you at home last night?",     ok:["were"]},
+  {q:"She ___ at work this morning. (не была)", ok:["wasn't","wasnt","was not"]},
+  {q:"The Beatles ___ famous.",         ok:["were"]},
+  {q:"___ Van Gogh French?",            ok:["was"]},
+  {q:"They ___ at the party. (не были)", ok:["weren't","werent","were not"]},
+  {q:"I ___ born in Scotland.",         ok:["was"]},
+  {q:"___ his parents American?",       ok:["were"]}
+];
+
+/* Level 5 — build the sentence (accepts variants where word order is free) */
+const BUILD = [
+  {tiles:["He","was","an","artist","."], ok:[["He","was","an","artist","."]]},
+  {tiles:["Were","they","famous","?"],   ok:[["Were","they","famous","?"]]},
+  {tiles:["She","wasn't","at","home","."], ok:[["She","wasn't","at","home","."]]},
+  {tiles:["I","was","born","in","1928","."], ok:[["I","was","born","in","1928","."]]},
+  {tiles:["Were","you","tired","?"],     ok:[["Were","you","tired","?"]]},
+  {tiles:["They","weren't","American","."], ok:[["They","weren't","American","."]]}
+];
+
+/* Level 6 — boss */
+const BOSS = [
+  {q:"Andy Warhol ___ an artist.", o:["was","were"], a:0},
+  {q:"___ they famous?",           o:["Was","Were"], a:1},
+  {q:"She ___ at home. (её не было)", o:["wasn't","weren't"], a:0},
+  {q:"We ___ tired.",              o:["was","were"], a:1},
+  {q:"___ he English?",            o:["Was","Were"], a:0},
+  {q:"They ___ at work. (их не было)", o:["wasn't","weren't"], a:1},
+  {q:"I ___ born in 1928.",        o:["was","were"], a:0},
+  {q:"___ you late?",              o:["Was","Were"], a:1}
+];
+
+/* =================== FLOW =================== */
+const levels = [
+  {tag:"Этап 1 / 6 · Память времени", intro:"Машина времени барахлит! Восстановите пары: английская фраза ↔ перевод. Нажимайте на две карточки.", run:runMemory},
+  {tag:"Этап 2 / 6 · Выбор курса", intro:"Выберите правильную форму: was, were, wasn't или weren't.", run:runMC},
+  {tag:"Этап 3 / 6 · Проверка хроник", intro:"Правда или ложь? Решайте быстро.", run:runTF},
+  {tag:"Этап 4 / 6 · Ремонт двигателя", intro:"Впишите пропущенное слово. У вас 2 попытки. Можно с сокращением и без: wasn't = was not.", run:runFill},
+  {tag:"Этап 5 / 6 · Сборка временной линии", intro:"Соберите предложение из слов по порядку. Можно «Сбросить». 2 попытки.", run:runBuild},
+  {tag:"Этап 6 / 6 · ХРАНИТЕЛЬ ВРЕМЕНИ", intro:"Финальный босс! Каждый верный ответ — удар (−1 HP). Ошибка — босс лечится (+1 HP). Победите его, чтобы вернуться в 2026!", run:runBoss}
+];
+let lvlIndex = 0;
+
+function showStart(){
+  stage.innerHTML = `
+    <div class="center">
+      <svg class="portalBig" viewBox="0 0 120 120">
+        <defs><radialGradient id="g" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#e8a13a"/><stop offset="60%" stop-color="#3ea8a0"/>
+          <stop offset="100%" stop-color="#232645"/></radialGradient></defs>
+        <circle cx="60" cy="60" r="52" fill="none" stroke="#3c4068" stroke-width="5"/>
+        <circle class="ring" cx="60" cy="60" r="40" fill="none" stroke="url(#g)" stroke-width="7"
+          stroke-dasharray="14 10" style="transform-origin:60px 60px;animation:spin 7s linear infinite"/>
+        <circle cx="60" cy="60" r="22" fill="url(#g)" opacity=".9"/>
+        <circle cx="60" cy="60" r="7" fill="#fff" opacity=".8"/>
+      </svg>
+      <div class="bigTitle">МАШИНА <span class="acc">ВРЕМЕНИ</span></div>
+      <div class="sub">Грамматика: <b>was / were</b>. За каждый верный ответ машина уносит вас глубже в прошлое: 2026 → 1928. Доберитесь до года, когда родился Энди Уорхол!</div>
+      <button class="startBtn" id="go">СТАРТ ▶</button>
+      <button class="rulesBtn" id="rb">📖 Правила was / were</button>
+      <div class="rules" id="rules">
+        <h4>Когда используем</h4>
+        <code>was</code> / <code>were</code> — о прошлом, часто с <i>yesterday, last night, in 2014</i>.<br>
+        <code>was</code> / <code>were</code> + <i>born</i>: <i>I was born in Scotland.</i>
+        <h4>[+] Утверждение</h4>
+        I / He / She / It <code>was</code> there.<br>You / We / They <code>were</code> there.
+        <h4>[–] Отрицание</h4>
+        I / He / She / It <code>wasn't</code> there.<br>You / We / They <code>weren't</code> there.
+        <h4>[?] Вопрос</h4>
+        <code>Was</code> I / he / she / it famous?<br><code>Were</code> you / we / they famous?
+        <h4>[✓] / [✗] Короткий ответ</h4>
+        Yes, I <code>was</code>. / Yes, you <code>were</code>.<br>
+        No, I <code>wasn't</code>. / No, you <code>weren't</code>.
+      </div>
+    </div>`;
+  document.getElementById('go').onclick = ()=>showIntro();
+  document.getElementById('rb').onclick = ()=>document.getElementById('rules').classList.toggle('show');
+}
+
+function showIntro(){
+  const L = levels[lvlIndex];
+  stage.innerHTML = `
+    <div class="center">
+      <div class="lvlTag">${L.tag}</div>
+      <div class="prompt" style="font-size:18px">${L.intro}</div>
+      <button class="startBtn" id="begin">Начать ▶</button>
+    </div>`;
+  document.getElementById('begin').onclick = ()=>levels[lvlIndex].run();
+}
+
+function nextLevel(){
+  lvlIndex++;
+  if(lvlIndex < levels.length) showIntro();
+  else showWin();
+}
+
+function header(idx,total){
+  return `<div class="row"><div class="lvlTag">${levels[lvlIndex].tag}</div>
+    <div class="qcount">${idx} / ${total}</div></div>`;
+}
+
+/* ---------- LEVEL 1: MEMORY ---------- */
+function runMemory(){
+  let cards = [];
+  MEM.forEach((p,i)=>{ cards.push({id:i,txt:p[0]}); cards.push({id:i,txt:p[1]}); });
+  for(let i=cards.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[cards[i],cards[j]]=[cards[j],cards[i]];}
+  let open=[], matched=0, lock=false;
+  stage.innerHTML = header('—',MEM.length)+`<div class="grid" id="grid"></div>`;
+  const grid=document.getElementById('grid');
+  cards.forEach((c,idx)=>{
+    const d=document.createElement('div'); d.className='mcard';
+    d.innerHTML=`<span class="back">⏳</span><span class="face">${c.txt}</span>`;
+    d.onclick=()=>{
+      if(lock||d.classList.contains('open')||d.classList.contains('matched'))return;
+      d.classList.add('open'); open.push({d,c});
+      if(open.length===2){
+        lock=true;
+        if(open[0].c.id===open[1].c.id){
+          setTimeout(()=>{
+            open.forEach(o=>o.d.classList.add('matched'));
+            award(); toast(); matched++; open=[]; lock=false;
+            if(matched===MEM.length) setTimeout(nextLevel,900);
+          },350);
+        } else {
+          setTimeout(()=>{open.forEach(o=>o.d.classList.remove('open'));open=[];lock=false;},850);
+        }
+      }
+    };
+    grid.appendChild(d);
+  });
+}
+
+/* ---------- LEVEL 2: MULTIPLE CHOICE ---------- */
+function runMC(){ mcEngine(MC,0,nextLevel); }
+function mcEngine(data,i,done){
+  if(i>=data.length){done();return;}
+  const item=data[i];
+  stage.innerHTML = header(i+1,data.length)+
+    `<div class="prompt">${item.q.replace('___','<span class="gap">___</span>')}</div>
+     <div class="opts ${item.o.length<3?'':''}" id="opts"></div>`;
+  const opts=document.getElementById('opts');
+  item.o.forEach((txt,k)=>{
+    const b=document.createElement('button'); b.className='btn'; b.textContent=txt;
+    b.onclick=()=>{
+      opts.querySelectorAll('.btn').forEach(x=>x.classList.add('lock'));
+      if(k===item.a){ b.classList.add('right'); award(); good(()=>mcEngine(data,i+1,done)); }
+      else{ b.classList.add('wrong'); opts.children[item.a].classList.add('right');
+            bad(item.o[item.a], ()=>mcEngine(data,i+1,done)); }
+    };
+    opts.appendChild(b);
+  });
+}
+
+/* ---------- LEVEL 3: TRUE / FALSE ---------- */
+function runTF(){ tfEngine(0); }
+function tfEngine(i){
+  if(i>=TF.length){nextLevel();return;}
+  const item=TF[i];
+  stage.innerHTML = header(i+1,TF.length)+
+    `<div class="prompt">${item.q}</div>
+     <div class="tf"><button class="btn" id="t">✅ True</button>
+     <button class="btn" id="f">❌ False</button></div>`;
+  const pick=(val,btn)=>{
+    document.getElementById('t').classList.add('lock');
+    document.getElementById('f').classList.add('lock');
+    if(val===item.a){ btn.classList.add('right'); award(); good(()=>tfEngine(i+1)); }
+    else{ btn.classList.add('wrong');
+      const correct=item.a?'True':'False';
+      bad(correct, ()=>tfEngine(i+1)); }
+  };
+  document.getElementById('t').onclick=e=>pick(true,e.currentTarget);
+  document.getElementById('f').onclick=e=>pick(false,e.currentTarget);
+}
+
+/* ---------- LEVEL 4: FILL THE GAP ---------- */
+function runFill(){ fillEngine(0); }
+function fillEngine(i){
+  if(i>=FILL.length){nextLevel();return;}
+  const item=FILL[i]; let tries=0;
+  stage.innerHTML = header(i+1,FILL.length)+
+    `<div class="prompt">${item.q.replace('___','<span class="gap">_____</span>')}</div>
+     <div class="inputRow">
+        <input class="field" id="inp" autocomplete="off" autocapitalize="off" placeholder="..." />
+        <button class="check" id="ck">Проверить</button></div>
+     <div class="hint" id="msg"></div>`;
+  const inp=document.getElementById('inp'), msg=document.getElementById('msg');
+  inp.focus();
+  const accept=item.ok.map(norm);
+  const submit=()=>{
+    const val=norm(inp.value);
+    if(!val) return;
+    if(accept.includes(val)){
+      inp.classList.add('right'); inp.disabled=true;
+      document.getElementById('ck').classList.add('lock');
+      award(); good(()=>fillEngine(i+1));
+    } else {
+      tries++;
+      if(tries<2){ inp.classList.add('wrong'); msg.textContent='Почти! Осталась 1 попытка.';
+        setTimeout(()=>inp.classList.remove('wrong'),600); inp.select(); }
+      else{ inp.classList.add('wrong'); inp.disabled=true;
+        document.getElementById('ck').classList.add('lock');
+        bad(item.ok[0], ()=>fillEngine(i+1)); }
+    }
+  };
+  document.getElementById('ck').onclick=submit;
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter')submit();});
+}
+
+/* ---------- LEVEL 5: BUILD SENTENCE ---------- */
+function runBuild(){ buildEngine(0); }
+function buildEngine(i){
+  if(i>=BUILD.length){nextLevel();return;}
+  const item=BUILD[i]; let tries=0; let chosen=[];
+  const shuffled=item.tiles.map((t,idx)=>({t,idx}));
+  for(let a=shuffled.length-1;a>0;a--){const b=Math.floor(Math.random()*(a+1));[shuffled[a],shuffled[b]]=[shuffled[b],shuffled[a]];}
+  stage.innerHTML = header(i+1,BUILD.length)+
+    `<div class="answerLine" id="ans"></div>
+     <div class="bank" id="bank"></div>
+     <div class="ctrlRow">
+       <button class="ghost" id="reset">↺ Сбросить</button>
+       <button class="check" id="ck" style="flex:1">Проверить</button>
+     </div>
+     <div class="hint" id="msg"></div>`;
+  const ansEl=document.getElementById('ans'), bankEl=document.getElementById('bank'), msg=document.getElementById('msg');
+  const accept=item.ok.map(seq=>norm(seq.join(' ')));
+
+  function render(){
+    bankEl.innerHTML=''; ansEl.innerHTML='';
+    shuffled.forEach(o=>{
+      const used=chosen.includes(o);
+      const t=document.createElement('div'); t.className='tile'+(used?' used':''); t.textContent=o.t;
+      t.onclick=()=>{ chosen.push(o); render(); };
+      bankEl.appendChild(t);
+    });
+    chosen.forEach((o,pos)=>{
+      const t=document.createElement('div'); t.className='tile inanswer'; t.textContent=o.t;
+      t.onclick=()=>{ chosen.splice(pos,1); render(); };
+      ansEl.appendChild(t);
+    });
+  }
+  render();
+  document.getElementById('reset').onclick=()=>{chosen=[];render();};
+  document.getElementById('ck').onclick=()=>{
+    if(chosen.length===0)return;
+    const got=norm(chosen.map(o=>o.t).join(' '));
+    if(accept.includes(got)){
+      ansEl.classList.add('right'); award(); good(()=>buildEngine(i+1));
+    } else {
+      tries++;
+      if(tries<2){ ansEl.classList.add('wrong'); msg.textContent='Не тот порядок. Осталась 1 попытка.';
+        setTimeout(()=>{ansEl.classList.remove('wrong');msg.textContent='';},900); }
+      else{ ansEl.classList.add('wrong');
+        bad(item.ok[0].join(' '), ()=>buildEngine(i+1)); }
+    }
+  };
+}
+
+/* ---------- LEVEL 6: BOSS ---------- */
+function runBoss(){
+  let hp=BOSS.length, maxHp=BOSS.length, i=0;
+  const draw=()=>{
+    if(i>=BOSS.length || hp<=0){ // win
+      setTimeout(showWin,500); return;
+    }
+    const item=BOSS[i];
+    stage.innerHTML = header(i+1,BOSS.length)+
+      `<div class="boss">
+        <svg class="bossSvg" id="bsvg" viewBox="0 0 120 120">
+          <ellipse cx="60" cy="108" rx="34" ry="7" fill="#000" opacity=".25"/>
+          <g class="arm"><rect x="14" y="58" width="14" height="34" rx="7" fill="#7a4ddb"/></g>
+          <g class="arm"><rect x="92" y="58" width="14" height="34" rx="7" fill="#7a4ddb"/></g>
+          <rect x="26" y="30" width="68" height="68" rx="22" fill="#8e5ef0"/>
+          <circle cx="60" cy="60" r="24" fill="#231a3a"/>
+          <circle cx="60" cy="60" r="24" fill="none" stroke="#e8a13a" stroke-width="3"/>
+          <line x1="60" y1="60" x2="60" y2="44" stroke="#e8a13a" stroke-width="3" stroke-linecap="round"/>
+          <line x1="60" y1="60" x2="72" y2="60" stroke="#3ea8a0" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="60" cy="60" r="3" fill="#fff"/>
+          <circle cx="44" cy="26" r="6" fill="#8e5ef0"/><circle cx="76" cy="26" r="6" fill="#8e5ef0"/>
+          <circle cx="44" cy="24" r="2.5" fill="#231a3a"/><circle cx="76" cy="24" r="2.5" fill="#231a3a"/>
+        </svg>
+        <div class="hpWrap">
+          <span class="hpTxt">❤ HP</span>
+          <div class="hpBar"><div class="hpFill" id="hpf" style="width:${hp/maxHp*100}%"></div></div>
+          <span class="hpTxt" id="hpn">${hp}</span>
+        </div>
+       </div>
+       <div class="prompt">${item.q.replace('___','<span class="gap">___</span>')}</div>
+       <div class="opts" id="opts"></div>`;
+    const opts=document.getElementById('opts');
+    item.o.forEach((txt,k)=>{
+      const b=document.createElement('button'); b.className='btn'; b.textContent=txt;
+      b.onclick=()=>{
+        opts.querySelectorAll('.btn').forEach(x=>x.classList.add('lock'));
+        if(k===item.a){
+          b.classList.add('right'); award();
+          hp=Math.max(0,hp-1);
+          const svg=document.getElementById('bsvg'); svg.classList.add('hit');
+          document.getElementById('hpf').style.width=(hp/maxHp*100)+'%';
+          document.getElementById('hpn').textContent=hp;
+          good(()=>{ i++; draw(); });
+        } else {
+          b.classList.add('wrong'); opts.children[item.a].classList.add('right');
+          hp=Math.min(maxHp,hp+1);
+          document.getElementById('hpf').style.width=(hp/maxHp*100)+'%';
+          document.getElementById('hpn').textContent=hp;
+          bad(item.o[item.a], ()=>{ i++; draw(); });
+        }
+      };
+      opts.appendChild(b);
+    });
+  };
+  draw();
+}
+
+/* ---------- WIN ---------- */
+function showWin(){
+  const maxPts = TOTAL_TASKS*10;
+  const pct = score/maxPts;
+  let stars = pct>=0.88 ? 3 : pct>=0.65 ? 2 : pct>=0.45 ? 1 : 0;
+  const starStr = '⭐'.repeat(stars) + '☆'.repeat(3-stars);
+  let msg = stars===3 ? 'Идеально! Машина времени в полном порядке.' :
+            stars===2 ? 'Отличный полёт во времени!' :
+            stars===1 ? 'Вы вернулись домой. Можно лучше — попробуйте ещё!' :
+                        'Машина дотянула до дома. Стоит потренироваться!';
+  stage.innerHTML = `
+    <div class="center">
+      <svg class="portalBig" viewBox="0 0 120 120">
+        <circle cx="60" cy="60" r="50" fill="none" stroke="#3c4068" stroke-width="5"/>
+        <circle cx="60" cy="60" r="34" fill="#3ea8a0" opacity=".25"/>
+        <text x="60" y="72" text-anchor="middle" font-size="40">🏁</text>
+      </svg>
+      <div class="bigTitle">ВЫ <span class="acc">ДОМА</span>!</div>
+      <div class="stars">${starStr}</div>
+      <div class="sub">${msg}<br>Очки: <b>${score}</b> из ${maxPts}</div>
+      <button class="againBtn" id="again">↺ Ещё раз</button>
+    </div>`;
+  document.getElementById('again').onclick=()=>{
+    score=0;correctCount=0;lvlIndex=0;
+    document.getElementById('pts').textContent='0';
+    updateProgress(); showStart();
+  };
+}
+
+/* =================== INIT =================== */
+updateProgress();
+showStart();
+</script>
+</body>
+</html>
